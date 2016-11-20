@@ -443,11 +443,13 @@ let testquad2 = insere_quadtree { top=200; bottom=46; left=79; right=116 } testq
 draw_quadtree testquad2;; *)
 
 
-let rec rightRectsList po rl =
-	match rl with
-	| [] -> []
-	| p::q when pointContenu po p -> p::(rightRectsList po q)
-	| p::q -> rightRectsList po q
+let rightRectsList po rl =
+	let rec aux po rl acc = 
+		match rl with
+		| [] -> acc
+		| p::q when pointContenu po p -> aux po q (p::acc)
+		| p::q -> aux po q acc
+	in aux po rl []
 ;;
 
 let listRectContientPoint p q =
