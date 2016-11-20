@@ -402,14 +402,14 @@ let pointContenu p r =
 ;;
 
 let intersection_mediane_vert rect sup =
-	if (rect.left < (sup.right-sup.left)/2 && rect.right > (sup.right-sup.left)/2) then
+	if (rect.left <= (sup.right-sup.left)/2 && rect.right >= (sup.right-sup.left)/2) then
 		true
 	else
 		false
 ;;
 
 let intersection_mediane_hor rect sup =
-	if (rect.top > (sup.top-sup.bottom)/2 && rect.bottom < (sup.top-sup.bottom)/2) then
+	if (rect.top >= (sup.top-sup.bottom)/2 && rect.bottom <= (sup.top-sup.bottom)/2) then
 		true
 	else
 		false
@@ -424,7 +424,36 @@ let intersection_mediane_hor rect sup =
 (* type quadtree = Empty | Q of support de type rect * (rect list) * (rect list) * quadtree * quadtree * quadtree * quadtree;; *)
 
 let rec insere_quadtree r q = 
-	let rec aux r q =
-		
-	in aux r q;;
+	let rec aux r q s =
+		match q with
+		| Empty -> aux r (Q (s, [], [], Empty, Empty, Empty, Empty)) s
+		| Q (su, rlv, rlh, q1, q2, q3, q4) when intersection_mediane_vert r s -> Q (s, r::rlv, rlh, q1, q2, q3, q4)
+		| Q (su, rlv, rlh, q1, q2, q3, q4) when intersection_mediane_hor r s -> Q (s, rlv, r::rlh, q1, q2, q3, q4)
+		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getNOsurface s) -> Q (s, rlv, rlh, (aux r q1 (getNOsurface s)), q2, q3, q4)
+		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getNEsurface s) -> Q (s, rlv, rlh, q1, (aux r q2 (getNEsurface s)), q3, q4)
+		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getSOsurface s) -> Q (s, rlv, rlh, q1, q2, (aux r q3 (getSOsurface s)), q4)
+		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getSEsurface s) -> Q (s, rlv, rlh, q1, q2, q3, (aux r q4 (getSEsurface s)))
+		| _ -> failwith "Cannot insert rect"
+	in aux r q { top=coteCarre; bottom=0; left=0; right=coteCarre }
+;;
+
+
+(* let testquad = insere_quadtree { top=215; bottom=25; left=210; right=680 } Empty;;
+let testquad2 = insere_quadtree { top=200; bottom=46; left=79; right=116 } testquad;;
+draw_quadtree testquad2;; *)
+
+
+let rec rightRectsList po rl =
+	match rl with
+	| [] -> []
+	| p::q when pointContenu po p -> p::(rightRectsList po q)
+	| p::q -> rightRectsList po q
+;;
+
+let listRectContientPoint p q =
+	let rec aux p q acc =
+		match q with
+		| Empty -> acc
+		| Q (su, rlv, rlh, q1, q2, q3, q4) -> aux p q1 (aux p q2 (aux p q3 (aux p q4 acc@(rightRectsList p rlv)@(rightRectsList p rlh)))) 
+	in aux p q []
 ;;
