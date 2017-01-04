@@ -1,4 +1,4 @@
-(************************
+(***********************
 *						*
 *	    TP d'IPF		*
 *						*
@@ -18,7 +18,7 @@
 
 
 (* Définition d'une constante pour la taille N du support de base *)
-let coteCarre = 800;;
+let coteCarre = 512;;
 
 (* Définition du type point à l'aide de 2 coordonnées : x et y *)
 type point = {
@@ -111,6 +111,14 @@ let rec affiche_arbre q =
 	print_newline();
 ;;
 
+
+let pointContenu p r =
+	if (p.x >= r.left && p.x <= r.right && p.y >= r.bottom && p.y <= r.top) then
+		true
+	else
+		false
+;;
+
 (* Returns the North-West sub-support of the rectangle *)
 let getNOsurface s =
 	{top=s.top; bottom=(s.top+s.bottom)/2; left=s.left; right=(s.right+s.left)/2}
@@ -149,43 +157,43 @@ let rec pappartient p tree =
 
 (* Retourne le chemin pour atteindre le point s'il est présent et échoue sinon *)
 let pchemin po tree = 
-	let rec aux p t acc = 
-		match t with
-		| PEmpty -> acc
-		| PNoeud (_, _, _, _, _, _) when not(pappartient p t) -> failwith "Error function pchemin: The point is not in the tree!"
-		| PNoeud (_, _, a, _, _, _) when (pappartient p a) -> aux p a ("NO"::acc) 
-		| PNoeud (_, _, _, a, _, _) when (pappartient p a) -> aux p a ("NE"::acc) 
-		| PNoeud (_, _, _, _, a, _) when (pappartient p a) -> aux p a ("SO"::acc) 
-		| PNoeud (_, _, _, _, _, a) when (pappartient p a) -> aux p a ("SE"::acc) 
-		| _ -> acc
-	in List.rev( aux po tree [] )
+	if not(pappartient po tree) then
+			failwith "Error function pchemin: The point is not in the tree!"
+	else
+		let rec aux p t acc = 		
+			match t with
+			| PNoeud (_, _, no, _, _, _) when (pappartient p no) -> aux p no ("NO"::acc) 
+			| PNoeud (_, _, _, ne, _, _) when (pappartient p ne) -> aux p ne ("NE"::acc) 
+			| PNoeud (_, _, _, _, so, _) when (pappartient p so) -> aux p so ("SO"::acc) 
+			| PNoeud (_, _, _, _, _, se) when (pappartient p se) -> aux p se ("SE"::acc) 
+			| _ -> acc
+		in List.rev( aux po tree [] )
 ;;
 
 (* Insère un point p dans un pquadtree q *)
-let rec insere _p _q = 
+let insere p q = 
 	let rec aux p q s =
 		match q with
-		| PEmpty -> PNoeud (p, {top=s.top; bottom=s.bottom; left=s.left; right=s.right}, PEmpty, PEmpty, PEmpty, PEmpty)
-		| PNoeud (_, _, _, _, _, _) when (p.x < s.bottom || p.x > s.top || p.y < s.left || p.y > s.right) -> failwith "Error function insere: The point cannot be inserted in the tree!"
-		| PNoeud (a, b, c, d, e, f) when (p.x <= (s.left+s.right)/2 && p.y > (s.bottom+s.top)/2) -> PNoeud (a, b, (aux p c (getNOsurface s)), d, e, f)
-		| PNoeud (a, b, c, d, e, f) when (p.x > (s.left+s.right)/2 && p.y > (s.bottom+s.top)/2) -> PNoeud (a, b, c, (aux p d (getNEsurface s)), e, f)
-		| PNoeud (a, b, c, d, e, f) when (p.x <= (s.left+s.right)/2 && p.y <= (s.bottom+s.top)/2) -> PNoeud (a, b, c, d, (aux p e (getSOsurface s)), f)
-		| PNoeud (a, b, c, d, e, f) when (p.x > (s.left+s.right)/2 && p.y <= (s.bottom+s.top)/2) -> PNoeud (a, b, c, d, e, (aux p f (getSEsurface s)))
-		| _ -> failwith "Error function insere: Strange case"
-	in aux _p _q { top=coteCarre; bottom=0; left=0; right=coteCarre }
+		| PEmpty when pointContenu p s -> PNoeud (p, s, PEmpty, PEmpty, PEmpty, PEmpty)
+		| PNoeud (a, b, c, d, e, f) when pointContenu p (getNOsurface s) -> PNoeud (a, b, (aux p c (getNOsurface s)), d, e, f)
+		| PNoeud (a, b, c, d, e, f) when pointContenu p (getNEsurface s) -> PNoeud (a, b, c, (aux p d (getNEsurface s)), e, f)
+		| PNoeud (a, b, c, d, e, f) when pointContenu p (getSOsurface s) -> PNoeud (a, b, c, d, (aux p e (getSOsurface s)), f)
+		| PNoeud (a, b, c, d, e, f) when pointContenu p (getSEsurface s) -> PNoeud (a, b, c, d, e, (aux p f (getSEsurface s)))
+		| _ -> failwith "Error function insere: The point cannot be inserted in the tree!"
+	in aux p q { top=coteCarre; bottom=0; left=0; right=coteCarre }
 ;; 
 
 (* Fonction permettant de dessiner un pquadtree à l'aide de la bibliothèque graphique *)
 let draw_pquadtree q = 	
 	Graphics.open_graph " ";
 	Graphics.set_window_title "PquadTree";
-	Graphics.resize_window coteCarre coteCarre;
+	Graphics.resize_window (coteCarre+1) (coteCarre+1);
 
 	let rec aux q = 
 		match q with
 		| PEmpty -> ();
 		| PNoeud (a, b, c, d, e, f) ->	(* We draw the border of the support *)
-										(* Graphics.draw_rect b.left (b.bottom-1) (b.right-b.left-1) (b.top-b.bottom); *)
+										Graphics.draw_rect b.left (b.bottom) (b.right-b.left) (b.top-b.bottom);
 										(* We draw the horizontal line of the subdivision *)
 										Graphics.moveto b.left ((b.top+b.bottom)/2); Graphics.lineto b.right ((b.top+b.bottom)/2);
 										(* We draw the vertical line of the subdivision *)
@@ -202,20 +210,48 @@ let draw_pquadtree q =
 	|  Graphics.Graphic_failure ("fatal I/O error") -> ()
 ;;
 
-let pquad1 = (insere {x=5; y=5} PEmpty);;
+(* print_string "________\nArbre v1\n________";;
+print_newline();;  *)
+
+(* let pquad1 = (insere {x=5; y=5} PEmpty);;
 let pquad2 = (insere {x=500; y=300} pquad1);;  
 let pquad3 = (insere {x=20; y=30} pquad2);;
 let pquad4 = (insere {x=160; y=170} pquad3);;
+let pquad5 = (insere {x=325; y=150} pquad4);; *)
+
+(* affiche_liste (pchemin {x=5; y=5} pquad5);;
+affiche_liste (pchemin {x=500; y=300} pquad5);;
+affiche_liste (pchemin {x=20; y=30} pquad5);;
+affiche_liste (pchemin {x=160; y=170} pquad5);;
+affiche_liste (pchemin {x=325; y=150} pquad5);;
+
+
+print_newline();;
+print_string "________\nArbre v2\n________";;
+print_newline();;
+
+let pquad1 = (insere {x=20; y=30} PEmpty);;
+let pquad2 = (insere {x=160; y=170} pquad1);;  
+let pquad3 = (insere {x=5; y=5} pquad2);;
+let pquad4 = (insere {x=500; y=300} pquad3);;
 let pquad5 = (insere {x=325; y=150} pquad4);;
+
+affiche_liste (pchemin {x=5; y=5} pquad5);;
+affiche_liste (pchemin {x=500; y=300} pquad5);;
+affiche_liste (pchemin {x=20; y=30} pquad5);;
+affiche_liste (pchemin {x=160; y=170} pquad5);;
+affiche_liste (pchemin {x=325; y=150} pquad5);; *)
+
 
 (* draw_pquadtree pquad5;; *)
 
-let rquadn = Uni Noir;;
+(* let rquadn = Uni Noir;;
 let rquadb = Uni Blanc;;
 let rquad1 = RQ (rquadb, rquadn, rquadb, rquadn);;
 let rquad2 = RQ (rquadn, rquadb, rquadb, rquad1);;
-let rquad4 = RQ (rquadb, rquadb, rquadb, rquadn);;
-let rquad3 = RQ (rquadb, rquadb, rquadn, rquad4);;
+let rquad3 = RQ (rquadn, rquad2, rquadb, rquadn);;
+let rquad4 = RQ (rquadb, rquadb, rquadn, rquad3);; *)
+ 
 
 let draw_rquadtree r = 
 	Graphics.open_graph " ";
@@ -224,7 +260,7 @@ let draw_rquadtree r =
 
 	let rec aux q r = 
 		match q with
-		| Uni Blanc -> Graphics.set_color (Graphics.rgb 255 255 255); Graphics.fill_rect r.left r.bottom (r.right-r.left) (r.top-r.bottom);
+		| Uni Blanc -> ();
 		| Uni Noir -> Graphics.set_color 0; Graphics.fill_rect r.left r.bottom (r.right-r.left) (r.top-r.bottom);
 		| RQ (a, b, c, d) -> 	aux a (getNOsurface r);
 								aux b (getNEsurface r);
@@ -241,7 +277,8 @@ let draw_rquadtree r =
 	|  Graphics.Graphic_failure ("fatal I/O error") -> ()
 ;;
 
- (* draw_rquadtree rquad2;;  *)
+(* draw_rquadtree rquad4;; *)
+
 
 (* Fonction permettant d'inverser les couleurs d'un rquadtree *)
 let rec inverse_rquadtree r =
@@ -251,32 +288,57 @@ let rec inverse_rquadtree r =
 	| RQ (a, b, c, d) -> RQ ((inverse_rquadtree a), (inverse_rquadtree b), (inverse_rquadtree c), (inverse_rquadtree d))
 ;;
 
-(* draw_rquadtree (inverse_rquadtree rquad2);; *)
+(* draw_rquadtree rquad2;;
+draw_rquadtree (inverse_rquadtree rquad2);;
+
+draw_rquadtree rquad4;;
+draw_rquadtree (inverse_rquadtree rquad4);; *)
+
+(* Fonction regrouppant les RQ de la même couleur *)
+let rec normalise p = 
+	match p with
+	| RQ (a, b, c, d) when (normalise a)=Uni Blanc && (normalise b)=Uni Blanc && (normalise c)=Uni Blanc && (normalise d)=Uni Blanc -> Uni Blanc
+	| RQ (a, b, c, d) when (normalise a)=Uni Noir && (normalise b)=Uni Noir && (normalise c)=Uni Noir && (normalise d)=Uni Noir -> Uni Noir
+	| RQ (a, b, c, d) -> RQ (normalise a, normalise b, normalise c, normalise d)
+	| _ -> p
+;;
 
 (* Fonction renvoyant l'intersection entre deux images *)
-let rec intersection_rquadtree p r =
-	match p, r with
-	| Uni Noir, Uni Noir -> Uni Noir
-	| RQ (a, b, c, d), RQ (e, f, g, h) -> RQ ((intersection_rquadtree a e), (intersection_rquadtree b f), (intersection_rquadtree c g), (intersection_rquadtree d h))
-	| _ -> Uni Blanc
+let intersection_rquadtree p r =
+	let rec intersection_rquadtree p r =
+		match p, r with
+		| Uni Noir, Uni Noir -> Uni Noir
+		| Uni Noir, RQ (a, b, c, d) -> RQ (a, b, c, d)
+		| RQ (a, b, c, d), Uni Noir -> RQ (a, b, c, d)
+		| RQ (a, b, c, d), RQ (e, f, g, h) -> RQ ((intersection_rquadtree a e), (intersection_rquadtree b f), (intersection_rquadtree c g), (intersection_rquadtree d h))
+		| _ -> Uni Blanc
+	in normalise (intersection_rquadtree p r)
 ;;
 
-(* draw_rquadtree (intersection_rquadtree rquad2 rquad3);; *)
+(* let rquad6 = RQ (rquad1, rquadb, rquadb, rquadn);;
+draw_rquadtree rquad2;;
+draw_rquadtree rquad6;;
+
+draw_rquadtree (intersection_rquadtree rquad2 rquad6);; *)
+
 
 (* Fonction renvoyant l'union entre deux images *)
-let rec union_rquadtree p r =
-	match p, r with
-	| Uni c, Uni r when c = Noir || r = Noir -> Uni Noir
-	| RQ (a, b, c, d), RQ (e, f, g, h) when (a=Uni Noir||e=Uni Noir) && (b=Uni Noir||f=Uni Noir) && (c=Uni Noir||g=Uni Noir) && (d=Uni Noir||h=Uni Noir) -> Uni Noir
-	| RQ (a, b, c, d), RQ (e, f, g, h) -> RQ ((union_rquadtree a e), (union_rquadtree b f), (union_rquadtree c g), (union_rquadtree d h))
-	| _ -> Uni Blanc
+let union_rquadtree p r =
+	let rec union_rquadtree p r =
+		match p, r with
+		| Uni Blanc, Uni Blanc -> Uni Blanc
+		| Uni Blanc, RQ (a, b, c, d) -> RQ (a, b, c, d)
+		| RQ (a, b, c, d), Uni Blanc -> RQ (a, b, c, d)
+		| RQ (a, b, c, d), RQ (e, f, g, h) -> RQ ((union_rquadtree a e), (union_rquadtree b f), (union_rquadtree c g), (union_rquadtree d h))
+		| _ -> Uni Noir
+	in normalise (union_rquadtree p r)
 ;;
 
-(*
-draw_rquadtree rquad2;;
-draw_rquadtree rquad3;;
-draw_rquadtree (union_rquadtree rquad2 rquad3);; 
-*)
+(* draw_rquadtree rquad3;;
+draw_rquadtree rquad4;;
+
+draw_rquadtree (union_rquadtree rquad3 rquad4);;  *)
+
 
 (* Fonction renvoyant l'image symétrique verticale *)
 let rec sym_hor_rquadtree r = 
@@ -292,24 +354,30 @@ let rec sym_vert_rquadtree r =
 	| RQ (a, b, c, d) -> RQ ((sym_vert_rquadtree b), (sym_vert_rquadtree a), (sym_vert_rquadtree d), (sym_vert_rquadtree c))
 ;;
 
-(* 
-draw_rquadtree rquad3;;
-draw_rquadtree (sym_hor_rquadtree rquad3);; 
-draw_rquadtree (sym_vert_rquadtree rquad3);; 
-*)
+
+(* let test1 = RQ (Uni Blanc, Uni Noir, Uni Blanc, Uni Noir);;
+let test2 = RQ (Uni Blanc, Uni Noir, Uni Blanc, test1);;
+let test3 = RQ (test2, Uni Blanc, Uni Noir, Uni Blanc);; *)
+
+(*
+draw_rquadtree test3;;
+draw_rquadtree (sym_hor_rquadtree test3);; 
+draw_rquadtree (sym_vert_rquadtree test3);;  *)
+
 
 let coder r = 
 	let rec aux r acc =
 		match r with
-		| Uni Blanc -> Un::Zero::acc
+		| Uni Blanc -> Zero::Un::acc
 		| Uni Noir -> Un::Un::acc
-		| RQ (a, b, c, d) -> Zero::(aux a (aux b (aux c (aux d acc))))
-	in aux r []
+		| RQ (a, b, c, d) -> (aux d (aux c (aux b (aux a (Zero::acc)))))
+	in List.rev(aux r [])
 ;;
 
-let arbrerquad = RQ(Uni Noir, RQ (Uni Noir, Uni Blanc, Uni Blanc, Uni Noir), Uni Blanc, Uni Noir);;
+(* let arbrerquad = RQ(Uni Noir, RQ (Uni Noir, Uni Blanc, Uni Blanc, Uni Noir), Uni Blanc, RQ (Uni Noir, Uni Blanc, Uni Blanc, Uni Noir));;
 
-(* affiche_liste (coder arbrerquad);; *)
+affiche_bit_liste (coder arbrerquad);; 
+draw_rquadtree arbrerquad;; *)
 
 
 (* Les quatres fonctions suivantes sont déclarées à la suite et uniquement séparées par des "and" car elles sont interdépendantes 
@@ -350,8 +418,10 @@ let rec decoder l =
 	| _ -> failwith "Erreur de liste"
 ;;
 
-(* draw_rquadtree arbrerquad;; *)
-(* draw_rquadtree (decoder (coder arbrerquad));;  *)
+
+(* 
+let testList = [Zero; Un; Un; Zero; Un; Un; Un; Zero; Un; Zero; Un; Un; Un; Zero; Zero; Un; Un; Un; Zero; Un; Zero; Un; Un];;
+draw_rquadtree (decoder testList);; *)
 
 
 
@@ -394,13 +464,6 @@ let draw_quadtree q =
  	____________________________________________________*)
 
 
-let pointContenu p r =
-	if (p.x > r.left && p.x < r.right && p.y > r.bottom && p.y < r.top) then
-		true
-	else
-		false
-;;
-
 let intersection_mediane_vert rect sup =
 	if (rect.left <= (sup.right-sup.left)/2 && rect.right >= (sup.right-sup.left)/2) then
 		true
@@ -415,47 +478,86 @@ let intersection_mediane_hor rect sup =
 		false
 ;;
 
+let rectangleContenu r = 
+	if r.top > coteCarre || r.bottom < 0 || r.left < 0 || r.right > coteCarre then
+		false
+	else
+		true
+;;
+
 
 (* 	____________________________________________________
 
  						Quadtrees
  	____________________________________________________*)
 
+
 (* type quadtree = Empty | Q of support de type rect * (rect list) * (rect list) * quadtree * quadtree * quadtree * quadtree;; *)
 
-let rec insere_quadtree r q = 
-	let rec aux r q s =
-		match q with
-		| Empty -> aux r (Q (s, [], [], Empty, Empty, Empty, Empty)) s
-		| Q (su, rlv, rlh, q1, q2, q3, q4) when intersection_mediane_vert r s -> Q (s, r::rlv, rlh, q1, q2, q3, q4)
-		| Q (su, rlv, rlh, q1, q2, q3, q4) when intersection_mediane_hor r s -> Q (s, rlv, r::rlh, q1, q2, q3, q4)
-		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getNOsurface s) -> Q (s, rlv, rlh, (aux r q1 (getNOsurface s)), q2, q3, q4)
-		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getNEsurface s) -> Q (s, rlv, rlh, q1, (aux r q2 (getNEsurface s)), q3, q4)
-		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getSOsurface s) -> Q (s, rlv, rlh, q1, q2, (aux r q3 (getSOsurface s)), q4)
-		| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getSEsurface s) -> Q (s, rlv, rlh, q1, q2, q3, (aux r q4 (getSEsurface s)))
-		| _ -> failwith "Cannot insert rect"
-	in aux r q { top=coteCarre; bottom=0; left=0; right=coteCarre }
+let insere_quadtree r q =
+	if not(rectangleContenu r) then
+		failwith "Error insere_quadtree : Rectangle cannot be inserted in the QuadTree"
+	else 
+		let rec aux r q s =
+			match q with
+			| Empty when intersection_mediane_vert r s -> Q (s, r::[], [], Empty, Empty, Empty, Empty)
+			| Empty when intersection_mediane_hor r s -> Q (s, [], r::[], Empty, Empty, Empty, Empty)
+			| Empty when pointContenu {x=r.left; y=r.top} (getNOsurface s) -> Q (s, [], [], (aux r Empty (getNOsurface s)), Empty, Empty, Empty)
+			| Empty when pointContenu {x=r.left; y=r.top} (getNEsurface s) -> Q (s, [], [], Empty, (aux r Empty (getNEsurface s)), Empty, Empty)
+			| Empty when pointContenu {x=r.left; y=r.top} (getSOsurface s) -> Q (s, [], [], Empty, Empty, (aux r Empty (getSOsurface s)), Empty)
+			| Empty when pointContenu {x=r.left; y=r.top} (getSEsurface s) -> Q (s, [], [], Empty, Empty, Empty, (aux r Empty (getSEsurface s)))
+			| Q (su, rlv, rlh, q1, q2, q3, q4) when intersection_mediane_vert r s -> Q (s, r::rlv, rlh, q1, q2, q3, q4)
+			| Q (su, rlv, rlh, q1, q2, q3, q4) when intersection_mediane_hor r s -> Q (s, rlv, r::rlh, q1, q2, q3, q4)
+			| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getNOsurface s) -> Q (s, rlv, rlh, (aux r q1 (getNOsurface s)), q2, q3, q4)
+			| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getNEsurface s) -> Q (s, rlv, rlh, q1, (aux r q2 (getNEsurface s)), q3, q4)
+			| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getSOsurface s) -> Q (s, rlv, rlh, q1, q2, (aux r q3 (getSOsurface s)), q4)
+			| Q (su, rlv, rlh, q1, q2, q3, q4) when pointContenu {x=r.left; y=r.top} (getSEsurface s) -> Q (s, rlv, rlh, q1, q2, q3, (aux r q4 (getSEsurface s)))
+			| _ -> failwith "Cannot insert rect"
+		in aux r q { top=coteCarre; bottom=0; left=0; right=coteCarre }
 ;;
 
 
-(* let testquad = insere_quadtree { top=215; bottom=25; left=210; right=680 } Empty;;
+(* let testquad = insere_quadtree { top=215; bottom=25; left=270; right=510 } Empty;;
 let testquad2 = insere_quadtree { top=200; bottom=46; left=79; right=116 } testquad;;
-draw_quadtree testquad2;; *)
+let testquad3 = insere_quadtree { top=4; bottom=0; left=0; right=100 } testquad2;;
+let testquad4 = insere_quadtree { top=290; bottom=250; left=360; right=470 } testquad3;;
+let testquad5 = insere_quadtree { top=450; bottom=400; left=9; right=67 } testquad4;;
 
 
-let rightRectsList po rl =
-	let rec aux po rl acc = 
-		match rl with
-		| [] -> acc
-		| p::q when pointContenu po p -> aux po q (p::acc)
-		| p::q -> aux po q acc
-	in aux po rl []
+draw_quadtree testquad5;; *)
+
+
+let rec rightRectsList po rl acc =
+	match rl with
+	| [] -> acc
+	| p::q when pointContenu po p -> rightRectsList po q (p::acc)
+	| p::q -> rightRectsList po q acc
 ;;
 
 let listRectContientPoint p q =
 	let rec aux p q acc =
 		match q with
 		| Empty -> acc
-		| Q (su, rlv, rlh, q1, q2, q3, q4) -> aux p q1 (aux p q2 (aux p q3 (aux p q4 acc@(rightRectsList p rlv)@(rightRectsList p rlh)))) 
+		| Q (su, rlv, rlh, q1, q2, q3, q4) -> aux p q1 (aux p q2 (aux p q3 (aux p q4 (rightRectsList p rlv (rightRectsList p rlh acc))))) 
 	in aux p q []
 ;;
+
+let rec affiche_liste_rectangle = function
+	| [] -> ()
+	| p::q -> Printf.printf "{top:%d, bot:%d, left: %d, right: %d}\n" p.top p.bottom p.left p.right; affiche_liste_rectangle q;
+;;
+
+(* let quad1recContient2 = insere_quadtree {top=50; bottom=0; left=0; right=120} Empty;;
+let quad2recContient2 = insere_quadtree {top=45; bottom=0; left=5; right=125} quad1recContient2;;
+let quad3recContient2 = insere_quadtree {top=400; bottom=200; left=2; right=6} quad2recContient2;;
+
+affiche_liste_rectangle (listRectContientPoint {x=85; y=26} quad3recContient2);; 
+
+print_newline();;
+ 
+let quad1recContient1 = insere_quadtree {top=50; bottom=0; left=0; right=120} Empty;;
+let quad2recContient1 = insere_quadtree {top=5; bottom=1; left=2; right=6} quad1recContient1;;
+let quad3recContient1 = insere_quadtree {top=7; bottom=1; left=1; right=8} quad2recContient1;;
+
+affiche_liste_rectangle (listRectContientPoint {x=120; y=30} quad3recContient1);; *)
+   
